@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[2]:
 
 
 from lips import get_root_path
@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 
-# In[2]:
+# In[3]:
 
 
 # indicate required paths
@@ -43,7 +43,7 @@ SPEED_SCALE = 75.0
 DEFAULT_SCALE = 1.0
 
 
-# In[3]:
+# In[4]:
 
 
 benchmark=AirfRANSBenchmark(benchmark_path = DIRECTORY_NAME,
@@ -53,7 +53,7 @@ benchmark=AirfRANSBenchmark(benchmark_path = DIRECTORY_NAME,
 benchmark.load(path=DIRECTORY_NAME)
 
 
-# In[4]:
+# In[5]:
 
 
 # Create normalizing constants
@@ -90,7 +90,7 @@ for i, var in zip(range(4), ['position', 'speed', 'pressure', 'turbulent_viscosi
     y_stds[i] = STDS[var]
 
 
-# In[5]:
+# In[6]:
 
 
 # Edge functions
@@ -151,7 +151,7 @@ def make_edges(sim):
     return edge_index, edge_features
 
 
-# In[6]:
+# In[7]:
 
 
 # Dataset preparation 
@@ -199,6 +199,13 @@ class AirFransGeo():
             # Airfoil distance
             surface_distance = (sim.sdf - MEANS['position']) / STDS['position']
 
+            # Rotate normal vector 90 degrees, take the angle in the positive x direction
+            # rotated_normal = rotate(closest_surfaces[:,2:], -np.pi/2)
+            # rotated_normal[np.where(rotated_normal[:,0]<0)] = rotate(rotated_normal[np.where(rotated_normal[:,0]<0)], np.pi)
+            # assert(np.min(rotated_normal[:,0]) >= 0.0)
+            # flow_theta = angle_off_x_axis(rotated_normal)
+            # flow_theta[np.where(rotated_normal[:,1] < 0)] = -1 * np.abs(flow_theta[np.where(rotated_normal[:,1] < 0)])
+
             # Is_airfoil
             is_airfoil = sim.surface.astype(np.float32)
 
@@ -219,7 +226,7 @@ class AirFransGeo():
             # X and Y coordinates of each point as well as normals (when on airfoil)
             x = np.hstack([position, np.expand_dims(inlet_speed,1), 
                         np.expand_dims(inlet_theta,1), np.expand_dims(is_airfoil,1),
-                         vector_to_surface, np.expand_dims(surface_theta,1), surface_distance]) 
+                         vector_to_surface, np.expand_dims(surface_theta,1), surface_distance]) #np.expand_dims(flow_theta, 1)]) 
             y = np.hstack([np.expand_dims(outlet_speed,1), np.expand_dims(outlet_theta,1), outlet_pressure, outlet_turb])
             edge_index, edge_attr = make_edges(sim)            
 
@@ -242,7 +249,7 @@ for i in range(0,103):
         train_indices.append(i)
 
 
-# In[ ]:
+# In[8]:
 
 
 # Load datasets
@@ -277,23 +284,10 @@ else:
         file.close()
 
 
-# In[8]:
-
-
-from torch_geometric.loader import DataLoader
-
-train_loader = DataLoader(train.data, shuffle=True, batch_size=5)
-cv_loader = DataLoader(cv.data, shuffle=True, batch_size=5)
-
-device = torch.device('cuda')
-
-
 # In[9]:
 
 
-import torch.nn.functional as F
-from torch.nn import Linear, GELU
-from torch_geometric.nn import GCNConv, GATConv
+BATCH_SIZE = 4
 
 FEATS = 9
 NODES = 16
@@ -301,67 +295,79 @@ OUTPUTS = 4
 
 CONV_LAYERS = 16
 
-# class GCN(torch.nn.Module):
-#     def __init__(self):
-#         super().__init__()
-#         self.lin1 = Linear(FEATS, NODES)
-#         self.gelu = GELU()
-#         # self.conv_layers = nn.ModuleList([GCNConv(NODES, NODES)]*CONV_LAYERS)
-#         self.conv_layers = nn.ModuleList([GATConv(NODES, NODES, edge_dim=2)]*CONV_LAYERS)
-#         # self.final = GCNConv(NODES, OUTPUTS)
-#         self.final = GATConv(NODES, OUTPUTS, edge_dim=2)
-
-#     def forward(self, data):
-#         x, edge_index = data.x, data.edge_index
-
-#         x = self.lin1(x)
-#         x = self.gelu(x)
-#         for layer in self.conv_layers:
-#             x = layer(x, edge_index)
-#         x = self.final(x, edge_index)
+activation = 'GELU'
 
 
-#         return x
+# In[10]:
+
+
+from torch_geometric.loader import DataLoader
+
+train_loader = DataLoader(train.data, shuffle=True, batch_size=BATCH_SIZE)
+cv_loader = DataLoader(cv.data, shuffle=True, batch_size=BATCH_SIZE)
+
+device = torch.device('cuda')
+
+
+# In[ ]:
+
+
+import torch.nn.functional as F
+from torch.nn import Linear, GELU, Tanh
+from torch_geometric.nn import GCNConv, GATConv
+
+
+class GATSkip_WeightShare(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.activation = eval(activation)()
+        self.std_layer = GATConv(NODES, NODES, edge_dim=2) #nn.ModuleList([GATConv(NODES, NODES, edge_dim=2) for _ in range(4)])
+        self.skip_layer = GATConv(NODES*2, NODES, edge_dim=2) 
+
+    def forward(self, data):
+        x = data['x']
+        edge_index = data['edge_index']
+        in_x = x.clone()
+        
+        for _ in range(4):
+            x = self.std_layer(x, edge_index)
+            x = self.activation(x)
+
+        x = self.skip_layer(torch.cat((in_x, x), axis=1), edge_index)
+        return x
 
 
 class GCN(torch.nn.Module):
     def __init__(self):
         super().__init__()
         self.lin1 = Linear(FEATS, NODES)
-        self.gelu = GELU()
+        self.activation = eval(activation)()
         # self.conv_layers = nn.ModuleList([GCNConv(NODES, NODES)]*CONV_LAYERS)
-        self.conv_layers = nn.ModuleList([GATConv(NODES, NODES, edge_dim=2) for _ in range(CONV_LAYERS)])
-        # self.conv_1 = GCNConv(NODES, NODES)
-        # self.conv_2 = GCNConv(NODES, NODES)
-        # self.conv_3 = GCNConv(NODES, NODES)
-        # self.conv_4 = GCNConv(NODES, NODES)
-        # self.conv_5 = GCNConv(NODES, NODES)
-        # self.conv_6 = GCNConv(NODES, NODES)
-        # self.conv_7 = GCNConv(NODES, NODES)
-        self.final = GCNConv(NODES, OUTPUTS)
+        # self.conv_layers = nn.ModuleList([GATConv(NODES, NODES, edge_dim=2) for _ in range(CONV_LAYERS)])
+        self.conv_layers = nn.ModuleList([GATSkip_WeightShare() for _ in range(4)])
+        self.final = GATConv(NODES, OUTPUTS, edge_dim=2)
         # self.final = GATConv(NODES, OUTPUTS, edge_dim=2)
 
     def forward(self, data):
         x, edge_index = data.x, data.edge_index
 
         x = self.lin1(x)
-        x = self.gelu(x)
+        x = self.activation(x)
         for layer in self.conv_layers:
-            x = layer(x, edge_index)
-            x = self.gelu(x)
+            x = layer({'x': x, 'edge_index': edge_index})
+            x = self.activation(x)
         x = self.final(x, edge_index)
-
 
         return x
 
 
-# In[10]:
+# In[12]:
 
 
 from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter()
 
-EPOCHS = 10000
+EPOCHS = 1000
 
 model = GCN().to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=0.005, weight_decay=5e-4)
@@ -459,7 +465,7 @@ for epoch in range(EPOCHS):
 #     optimizer.step()
 
 
-# In[50]:
+# In[ ]:
 
 
 # Reconstruct an example using model predictions
@@ -474,7 +480,7 @@ with torch.no_grad():
         #     print(loss_fn(out[i], torch.divide(batch.y[i].to('cpu'), scaler)))
 
 
-# In[60]:
+# In[ ]:
 
 
 # x = torch.multiply(sample.x.detach().cpu(), x_scaler).numpy()
@@ -522,7 +528,7 @@ plt.colorbar(sc3)
 plt.show()
 
 
-# In[61]:
+# In[ ]:
 
 
 # x = torch.multiply(sample.x.detach().cpu(), x_scaler).numpy()
