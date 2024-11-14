@@ -284,16 +284,16 @@ else:
         file.close()
 
 
-# In[9]:
+# In[ ]:
 
 
-BATCH_SIZE = 4
+BATCH_SIZE = 2
 
 FEATS = 9
 NODES = 16
 OUTPUTS = 4
 
-CONV_LAYERS = 16
+CONV_LAYERS = 8
 
 activation = 'GELU'
 
@@ -344,7 +344,7 @@ class GCN(torch.nn.Module):
         self.activation = eval(activation)()
         # self.conv_layers = nn.ModuleList([GCNConv(NODES, NODES)]*CONV_LAYERS)
         # self.conv_layers = nn.ModuleList([GATConv(NODES, NODES, edge_dim=2) for _ in range(CONV_LAYERS)])
-        self.conv_layers = nn.ModuleList([GATSkip_WeightShare() for _ in range(4)])
+        self.conv_layers = nn.ModuleList([GATSkip_WeightShare() for _ in range(CONV_LAYERS)])
         self.final = GATConv(NODES, OUTPUTS, edge_dim=2)
         # self.final = GATConv(NODES, OUTPUTS, edge_dim=2)
 
