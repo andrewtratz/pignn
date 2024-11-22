@@ -1,5 +1,7 @@
 import torch
 import numpy as np
+import os
+import datetime
 
 from data import *
 from config import *
@@ -7,6 +9,14 @@ from loader import *
 from interpolation import *
 from physics import *
 from model import *
+
+if not os.path.exists('models'):
+    os.mkdir('models')
+
+current_time = datetime.datetime.now()
+time_path = str(current_time.month) + '_' + str(current_time.day) + '_' + str(current_time.hour) + '_' + str(current_time.minute) 
+save_path = os.path.join('models', time_path)
+os.mkdir(save_path)
 
 # Make train and CV splits
 cv_indices = list(np.array(range(1,int(103/5)),dtype=np.intc)*5)
@@ -63,6 +73,8 @@ def train_one_epoch(model, optimizer, train_loader, device, scaler, losstypes, l
     PL = PINNLoss(device)
     SU = ScaleUp()
     losses={}
+    
+
     for loss in losstypes:
         losses[loss] = []
 
@@ -105,7 +117,7 @@ def train_one_epoch(model, optimizer, train_loader, device, scaler, losstypes, l
     for loss in losstypes:
         writer.add_scalar("train/" + loss, avg_losses[loss], epoch)
 
-def validation_loop(model, cv_loader, device, scaler, losstypes, loss_fn):
+def validation_loop(model, cv_loader, device, scaler, losstypes, loss_fn, best_loss):
 
     PL = PINNLoss(device)
     SU = ScaleUp()
@@ -137,6 +149,10 @@ def validation_loop(model, cv_loader, device, scaler, losstypes, loss_fn):
             for loss in losstypes:
                 losses[loss].append(eval(loss).item())
 
+            if combo_cv.cpu().item() < best_loss:
+                best_loss = combo_cv.cpu().item()
+                torch.save(model.state_dict(), os.path.join(save_path, 'best_model.pth'))
+
     # Wrap up CV
     avg_losses = {}
     for loss in losstypes:
@@ -147,10 +163,12 @@ def validation_loop(model, cv_loader, device, scaler, losstypes, loss_fn):
     print(loss_str)
     for loss in losstypes:
         writer.add_scalar("cv/" + loss, avg_losses[loss], epoch)
+    return best_loss
 
+best_loss = 10000.0
 for epoch in range(EPOCHS):
     train_one_epoch(model, optimizer, train_loader, device, None, losstypes, loss_fn, epoch)
     cv_losses = losstypes[:-2]
     cv_losses.append('loss_cv')
     cv_losses.append('combo_cv')
-    validation_loop(model, cv_loader, device, None, cv_losses, loss_fn)
+    best_loss = validation_loop(model, cv_loader, device, None, cv_losses, loss_fn, best_loss)
