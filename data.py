@@ -8,50 +8,52 @@ from lips.benchmark.airfransBenchmark import AirfRANSBenchmark
 
 from config import *
 
+if REFRESH:
+    benchmark=AirfRANSBenchmark(benchmark_path = DIRECTORY_NAME,
+                                config_path = BENCH_CONFIG_PATH,
+                                benchmark_name = BENCHMARK_NAME,
+                                log_path = LOG_PATH)
+    benchmark.load(path=DIRECTORY_NAME)
 
 
-benchmark=AirfRANSBenchmark(benchmark_path = DIRECTORY_NAME,
-                            config_path = BENCH_CONFIG_PATH,
-                            benchmark_name = BENCHMARK_NAME,
-                            log_path = LOG_PATH)
-benchmark.load(path=DIRECTORY_NAME)
+    # Create normalizing constants
+    MEANS = {}
+    STDS = {}
 
+    for var in ['x-position', 'y-position', 'x-inlet_velocity', 'x-velocity', 'pressure', 'turbulent_viscosity']:
+        MEANS[var] = np.mean(benchmark.train_dataset.data[var])
+        STDS[var] = np.std(benchmark.train_dataset.data[var])
 
-# Create normalizing constants
-MEANS = {}
-STDS = {}
+    MEANS['speed'] = MEANS['x-inlet_velocity']
+    STDS['speed'] = STDS['x-inlet_velocity']
+    MEANS['position'] = 0.0
+    STDS['position'] = 1.0
 
-for var in ['x-position', 'y-position', 'x-inlet_velocity', 'x-velocity', 'pressure', 'turbulent_viscosity']:
-    MEANS[var] = np.mean(benchmark.train_dataset.data[var])
-    STDS[var] = np.std(benchmark.train_dataset.data[var])
+    for var in ['x-position', 'y-position', 'x-inlet_velocity', 'x-velocity']:
+        MEANS.pop(var, None)
+        STDS.pop(var, None)
 
-MEANS['speed'] = MEANS['x-inlet_velocity']
-STDS['speed'] = STDS['x-inlet_velocity']
-MEANS['position'] = 0.0
-STDS['position'] = 1.0
+    print(MEANS)
+    print(STDS)
 
-for var in ['x-position', 'y-position', 'x-inlet_velocity', 'x-velocity']:
-    MEANS.pop(var, None)
-    STDS.pop(var, None)
+    x_means = np.zeros(2, dtype=np.float32)
+    x_stds = np.zeros(2, dtype=np.float32)
+    y_means = np.zeros(4, dtype=np.float32)
+    y_stds = np.zeros(4, dtype=np.float32)
 
-print(MEANS)
-print(STDS)
+    for i, var in zip(range(2), ['position', 'speed']):        
+        x_means[i] = MEANS[var]
+        x_stds[i] = STDS[var]
 
-x_means = np.zeros(2, dtype=np.float32)
-x_stds = np.zeros(2, dtype=np.float32)
-y_means = np.zeros(4, dtype=np.float32)
-y_stds = np.zeros(4, dtype=np.float32)
+    for i, var in zip(range(4), ['position', 'speed', 'pressure', 'turbulent_viscosity']):        
+        y_means[i] = MEANS[var]
+        y_stds[i] = STDS[var]
 
-for i, var in zip(range(2), ['position', 'speed']):        
-    x_means[i] = MEANS[var]
-    x_stds[i] = STDS[var]
-
-for i, var in zip(range(4), ['position', 'speed', 'pressure', 'turbulent_viscosity']):        
-    y_means[i] = MEANS[var]
-    y_stds[i] = STDS[var]
-
-MEANS['pressure'] = 0.0
-MEANS['turbulent_viscosity'] = 0.0
+    MEANS['pressure'] = 0.0
+    MEANS['turbulent_viscosity'] = 0.0
+else:
+    MEANS = {'pressure': -395.22959540860137, 'turbulent_viscosity': 0.0008392954292084482, 'speed': 63.15423170302567, 'position': 0.0}
+    STDS = {'pressure': 2425.738434726353, 'turbulent_viscosity': 0.0030420989011928183, 'speed': 8.487422521188462, 'position': 1.0}
 
 
 # Create label and data array for single edge

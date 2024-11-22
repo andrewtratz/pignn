@@ -5,3 +5,5 @@
 *tfevents*
 *.pkl*
 *.csv*
+*__*
+*.prof*

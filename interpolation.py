@@ -6,6 +6,26 @@ def shift_dev(t, device):
         return t.to(device)
     else:
         return t
+    
+
+def alloc(ns, k, y, device):
+    lhs = torch.zeros((ns, k+1, k+1), dtype=torch.float32, device=device)
+    rhs = torch.zeros((ns, k+1, y.shape[1]), dtype=torch.float32, device=device)
+    return lhs, rhs
+
+def make_lhs(lhs, kernel_matrix, batch_indices, k, device):
+    lhs[:,:k,:k] = kernel_matrix[batch_indices, :k, :k] + 2*torch.diag(torch.ones(k, device=device))
+    lhs[:,k,:] = 1.0
+    lhs[:,:,k] = 1.0
+    return lhs
+
+def make_rhs(rhs, k, y, neighbors, batch_indices):
+    rhs[:,:k] = y[torch.vstack([neighbors[i] for i in batch_indices])]
+    rhs[:,k] = 0.0
+    return rhs
+
+def solve(lhs, rhs):
+    return torch.linalg.solve(lhs, rhs)
 
 # Do efficient batched local interpolation of response variables over the input mesh
 
@@ -18,74 +38,52 @@ def batched_interpolation(pinn_data, y, batch_size=1000, device='cpu'):
 
     coeffs = torch.zeros((n, k, y.shape[1]), dtype=torch.float32, device=device) # Output tensor    
 
-    # Batch everything up
-    # batches = n // batch_size
-    # if n % batch_size != 0:
-    #     batches += 1
+    # Create index lists by neighbor count
+    idx_by_count = {0:[], 1:[], 2:[], 3:[], 4:[], 5:[], 6:[], 7:[], 8:[], 9:[]}
 
-    end = 0
-    while(True):
-        # start = batch_num*batch_size
-        # end = min(n, start+batch_size)
-        start = end
-        end = min(n, start+batch_size)
+    for i in range(n):
+        idx_by_count[len(neighbors[i])].append(i)
 
-        # Each batch must match on # of neighbors dimension
-        k = len(neighbors[start])
+    for k in range(1,10):
 
-        # Avoid situations where start has zero dimension k
-        if k == 0:
-            if start == n-1:
-                break
-            else:
-                end = start + 1
-                continue
+        # Chunk up the indices into batches if needed
+        batches = len(idx_by_count[k]) // batch_size
+        if len(idx_by_count[k]) % batch_size != 0:
+            batches += 1
 
-        # Set up LHS tensor
-        # Count non-surface nodes in batch
-        ns = 0
-        for i in range(start, end):
-            if len(neighbors[i]) == k:
-                ns += 1
-            if len(neighbors[i]) > 0 and len(neighbors[i]) != k:
-                end = i # Set end to where our k neighbors change quantity
-                break
+        end = 0
+        for _ in range(batches):
+            start = end
+            end = min(len(idx_by_count[k]), start + batch_size)
+            ns = end - start
 
-        # Create LHS tensor and RHS tensor
-        lhs = torch.zeros((ns, k+1, k+1), dtype=torch.float32, device=device)
-        rhs = torch.zeros((ns, k+1, y.shape[1]), dtype=torch.float32, device=device)
-        idx = 0
-        for i in range(start, end):
-            if len(neighbors[i]) == 0:
-                continue
-            lhs[idx,:k,:k] = kernel_matrix[i, :k, :k] + 2*torch.diag(torch.ones(k, device=device)) # Smoothing eliminates singularity
-            lhs[idx,k,:] = 1.0
-            lhs[idx,:,k] = 1.0 
-            # lhs[idx] = kernel_matrix[i, :k, :k] + torch.diag(torch.ones(k, device=device)*-1.0) # Smoothing eliminates singularity
+            batch_indices = idx_by_count[k][start:end]
 
-            # rank = torch.linalg.matrix_rank(lhs[idx])
-            # if rank != k:
-            #     print("ruh roh!")
+            # Create LHS tensor and RHS tensor
+            lhs, rhs = alloc(ns, k, y, device)
+            
+            # idx = 0
+            # for i in batch_indices:
+            #     lhs[idx,:k,:k] = kernel_matrix[i, :k, :k] + 2*torch.diag(torch.ones(k, device=device)) # Smoothing eliminates singularity
+            #     lhs[idx,k,:] = 1.0
+            #     lhs[idx,:,k] = 1.0 
 
-            y_neighbor = y[neighbors[i].type(torch.IntTensor)]
-            rhs[idx, :k] = y_neighbor[:k]
-            rhs[idx, k] = 0.0
-            idx += 1
+            #     # y_neighbor = y[neighbors[i].type(torch.IntTensor)]
+            #     # rhs[idx, :k] = y_neighbor[:k]
+            #     # rhs[idx, k] = 0.0
+            #     idx += 1
 
-        # Batch solve for the coefficients
-        tmp_coeff = torch.linalg.solve(lhs, rhs)
+            lhs = make_lhs(lhs, kernel_matrix, batch_indices, k, device)
+            rhs = make_rhs(rhs, k, y, neighbors, batch_indices)
 
-        # Store coefficients into output
-        idx = 0
-        for i in range(start, end):
-            if len(neighbors[i]) == 0:
-                continue
-            coeffs[i, :k, :] = tmp_coeff[idx, :k] # Keep all coefficients
-            idx += 1
+            # Batch solve for the coefficients
+            tmp_coeff = solve(lhs, rhs)
 
-        # Break if finished
-        if end == n-1:
-            break
+            # Store coefficients into output
+            idx = 0
+            for i in batch_indices:
+                coeffs[i, :k, :] = tmp_coeff[idx, :k] # Keep all coefficients
+                idx += 1
 
     return coeffs 
 

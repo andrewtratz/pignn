@@ -41,9 +41,6 @@ def loss_fn(y_pred, y_true):
     losses.append(overall_loss)
     return losses
 
-
-
-
 class ScaleUp(nn.Module):
     def forward(self, output):
         y = output.clone()
@@ -57,8 +54,6 @@ class ScaleUp(nn.Module):
         y[:,3] = (y[:,3]*STDS['turbulent_viscosity']) + MEANS['turbulent_viscosity']
         return y
 
-
-LAMBDA = 3.0   
 
 losstypes = ['loss_speed', 'loss_theta', 'loss_press', 'loss_turb', 'mass_err', 'mom_x_err', 'mom_y_err', 'loss_train', 'combo_train']
 

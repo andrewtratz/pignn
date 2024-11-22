@@ -9,6 +9,9 @@ LOG_PATH = LIPS_PATH + "lips_logs.log"
 BENCH_CONFIG_PATH = os.path.join("../Kit", "airfoilConfigurations","benchmarks","confAirfoil.ini") #Configuration file related to the benchmark
 SIM_CONFIG_PATH = os.path.join("../Kit", "airfoilConfigurations","simulators","torch_fc.ini") #Configuration file re
 
+# Data params
+REFRESH = False
+
 # Model params
 FEATS = 9
 NODES = 16
@@ -20,4 +23,7 @@ activation = 'GELU'
 CAP_SIZE = 1
 BATCH_SIZE = 2
 EPOCHS = 10
+
+# Hyperparams
+LAMBDA = 5.0   
 
