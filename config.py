@@ -20,10 +20,11 @@ CONV_LAYERS = 8
 activation = 'GELU'
 
 # Training params
-CAP_SIZE = 1
-BATCH_SIZE = 2
-EPOCHS = 10
+CAP_SIZE = 150
+BATCH_SIZE = 1
+EPOCHS = 200
 
 # Hyperparams
+PINN_LOSS_ON = False
 LAMBDA = 5.0   
 

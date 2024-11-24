@@ -1,5 +1,7 @@
 /Datasets/runs/*
 /Datasets/Archive/*
+/models*
+*.pth*
 *.npy
 *model_2*
 *tfevents*

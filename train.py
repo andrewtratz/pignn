@@ -65,7 +65,10 @@ class ScaleUp(nn.Module):
         return y
 
 
-losstypes = ['loss_speed', 'loss_theta', 'loss_press', 'loss_turb', 'mass_err', 'mom_x_err', 'mom_y_err', 'loss_train', 'combo_train']
+if PINN_LOSS_ON:
+    losstypes = ['loss_speed', 'loss_theta', 'loss_press', 'loss_turb', 'mass_err', 'mom_x_err', 'mom_y_err', 'loss_train', 'combo_train']
+else:
+    losstypes = ['loss_speed', 'loss_theta', 'loss_press', 'loss_turb', 'loss_train']
 
 def train_one_epoch(model, optimizer, train_loader, device, scaler, losstypes, loss_fn, epoch):
 
@@ -83,25 +86,30 @@ def train_one_epoch(model, optimizer, train_loader, device, scaler, losstypes, l
         optimizer.zero_grad()
 
         data = batch['instance']
-        pinn_data = batch['pinn_data']
+        if PINN_LOSS_ON:
+            pinn_data = batch['pinn_data']
+
         out = model(data.to(device))
         # y_true = torch.divide(batch.y, scaler)
         y_true = data.y
         loss_speed, loss_theta, loss_press, loss_turb, loss_train = loss_fn(out, y_true)
 
-
-        # Combine loss with physics-informed loss term
-        scaled_output = SU(out)
-        pred_coeffs = batched_interpolation(pinn_data, scaled_output, batch_size=200000, device=device)
-        mass_err, mom_x_err, mom_y_err = PL.forward(scaled_output, pred_coeffs, pinn_data['d1terms'].to(device), pinn_data['d2terms'].to(device),
-                                                    pinn_data, reduce=True)        
-        avg_pinn_err = mass_err + mom_x_err + mom_y_err
-        combo_train = loss_train + avg_pinn_err*LAMBDA
+        if PINN_LOSS_ON:
+            # Combine loss with physics-informed loss term
+            scaled_output = SU(out)
+            pred_coeffs = batched_interpolation(pinn_data, scaled_output, batch_size=200000, device=device)
+            mass_err, mom_x_err, mom_y_err = PL.forward(scaled_output, pred_coeffs, pinn_data['d1terms'].to(device), pinn_data['d2terms'].to(device),
+                                                        pinn_data, reduce=True)        
+            avg_pinn_err = mass_err + mom_x_err + mom_y_err
+            combo_train = loss_train + avg_pinn_err*LAMBDA
 
         for loss in losstypes:
             losses[loss].append(eval(loss))
 
-        combo_train.backward()
+        if PINN_LOSS_ON:
+            combo_train.backward()
+        else:
+            loss_train.backward()
         optimizer.step()
 
     # Wrap up epoch
@@ -131,27 +139,34 @@ def validation_loop(model, cv_loader, device, scaler, losstypes, loss_fn, best_l
     with torch.no_grad():
         for batch in tqdm(cv_loader):
             data = batch['instance']
-            pinn_data = batch['pinn_data']
+            if PINN_LOSS_ON:
+                pinn_data = batch['pinn_data']
             out = model(data.to(device))
             # y_true = torch.divide(batch.y, scaler)
             y_true = data.y
             loss_speed, loss_theta, loss_press, loss_turb, loss_cv = loss_fn(out, y_true)
 
             
+            if PINN_LOSS_ON:
+                # Combine loss with physics-informed loss term
+                scaled_output = SU(out)
+                pred_coeffs = batched_interpolation(pinn_data, scaled_output, batch_size=200000, device=device)
+                mass_err, mom_x_err, mom_y_err = PL.forward(scaled_output, pred_coeffs, pinn_data['d1terms'].to(device), pinn_data['d2terms'].to(device),
+                                                            pinn_data, reduce=True)        
+                avg_pinn_err = mass_err + mom_x_err + mom_y_err
+                combo_cv = loss_cv + avg_pinn_err*LAMBDA
 
-            # Combine loss with physics-informed loss term
-            scaled_output = SU(out)
-            pred_coeffs = batched_interpolation(pinn_data, scaled_output, batch_size=200000, device=device)
-            mass_err, mom_x_err, mom_y_err = PL.forward(scaled_output, pred_coeffs, pinn_data['d1terms'].to(device), pinn_data['d2terms'].to(device),
-                                                        pinn_data, reduce=True)        
-            avg_pinn_err = mass_err + mom_x_err + mom_y_err
-            combo_cv = loss_cv + avg_pinn_err*LAMBDA
             for loss in losstypes:
                 losses[loss].append(eval(loss).item())
 
-            if combo_cv.cpu().item() < best_loss:
-                best_loss = combo_cv.cpu().item()
-                torch.save(model.state_dict(), os.path.join(save_path, 'best_model.pth'))
+            if PINN_LOSS_ON:
+                if combo_cv.cpu().item() < best_loss:
+                    best_loss = combo_cv.cpu().item()
+                    torch.save(model.state_dict(), os.path.join(save_path, 'best_model.pth'))
+            else:
+                if loss_cv.cpu().item() < best_loss:
+                    best_loss = loss_cv.cpu().item()
+                    torch.save(model.state_dict(), os.path.join(save_path, 'best_model.pth'))
 
     # Wrap up CV
     avg_losses = {}
@@ -170,5 +185,6 @@ for epoch in range(EPOCHS):
     train_one_epoch(model, optimizer, train_loader, device, None, losstypes, loss_fn, epoch)
     cv_losses = losstypes[:-2]
     cv_losses.append('loss_cv')
-    cv_losses.append('combo_cv')
+    if PINN_LOSS_ON:
+        cv_losses.append('combo_cv')
     best_loss = validation_loop(model, cv_loader, device, None, cv_losses, loss_fn, best_loss)
