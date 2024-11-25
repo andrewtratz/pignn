@@ -19,7 +19,7 @@ class GATSkip_WeightShare(torch.nn.Module):
         edge_index = data['edge_index']
         in_x = x.clone()
         
-        for _ in range(4):
+        for _ in range(LAYER_REPEATS):
             x = self.std_layer(x, edge_index)
             x = self.activation(x)
 

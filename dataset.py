@@ -18,7 +18,7 @@ from physics import *
 from interpolation import *
 
 class AirFransGeo():
-    def __init__(self, dataset, indices, max_neighbors=9):
+    def __init__(self, dataset, indices, max_neighbors=9, save_path='traincv/', device='cuda'):
         self.dataset = dataset
         self.indices = indices
         self.data = []
@@ -182,14 +182,14 @@ class AirFransGeo():
             coeffs = batched_interpolation(self.pinn_data[-1], y, batch_size=200000, device='cuda')
             self.pinn_data[-1]['true_coeffs'] = coeffs.detach().cpu() 
 
-            PL = PINNLoss()
+            PL = PINNLoss(device='cpu')
             preds = torch.hstack([torch.from_numpy(sim.velocity), torch.tensor(torch.from_numpy(sim.pressure)), torch.from_numpy(sim.nu_t)])
-            mass_err, mom_x_err, mom_y_err = PL(preds, self.pinn_data[-1]['true_coeffs'], self.pinn_data[-1]['d1terms'], self.pinn_data[-1]['d2terms'])   #preds, coeffs, d1terms, d2terms
+            mass_err, mom_x_err, mom_y_err = PL.forward(preds, self.pinn_data[-1]['true_coeffs'], self.pinn_data[-1]['d1terms'], self.pinn_data[-1]['d2terms'])   #preds, coeffs, d1terms, d2terms
             self.pinn_data[-1]['mass_err'] = mass_err
             self.pinn_data[-1]['mom_x_err'] = mom_x_err
             self.pinn_data[-1]['mom_y_err'] = mom_y_err
 
-            with open('traincv/' + str(i) + '.pkl', 'wb') as handle:
+            with open(save_path + str(i) + '.pkl', 'wb') as handle:
                 pickle.dump({'instance': instance, 'pinn_data': self.pinn_data[-1]}, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     def len(self):

@@ -15,6 +15,7 @@ C = 20.05*np.sqrt(T) # Approximation of the sound velocity of air at temperature
 
 class PINNLoss(nn.Module):
     def __init__(self, device):
+        super(PINNLoss, self).__init__()
         self.device = device
 
     def forward(self, preds, coeffs, d1terms, d2terms, baseline_err=None, reduce=False):

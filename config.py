@@ -17,12 +17,13 @@ FEATS = 9
 NODES = 16
 OUTPUTS = 4
 CONV_LAYERS = 8
+LAYER_REPEATS = 4
 activation = 'GELU'
 
 # Training params
-CAP_SIZE = 150
+CAP_SIZE = 2000
 BATCH_SIZE = 1
-EPOCHS = 200
+EPOCHS = 500
 
 # Hyperparams
 PINN_LOSS_ON = False
