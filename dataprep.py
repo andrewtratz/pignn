@@ -38,4 +38,4 @@ benchmark=AirfRANSBenchmark(benchmark_path = DIRECTORY_NAME,
 benchmark.load(path=DIRECTORY_NAME)
 
 # AirFransGeo(benchmark._test_dataset, [i for i in range(benchmark._test_dataset.extra_data['simulation_names'].shape[0])][133:], save_path='Datasets/test/')
-AirFransGeo(benchmark._test_ood_dataset, [i for i in range(benchmark._test_ood_dataset.extra_data['simulation_names'].shape[0])][130:], save_path='Datasets/ood/')
+AirFransGeo(benchmark._test_ood_dataset, [i for i in range(benchmark._test_ood_dataset.extra_data['simulation_names'].shape[0])][130+119:], save_path='Datasets/ood/')
