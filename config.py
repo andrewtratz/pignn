@@ -1,6 +1,10 @@
 import os
 from lips import get_root_path
 
+# Model load
+LOAD_MODEL = True
+MODEL_PATH = 'models/11_25_0_10/best_model.pth'
+
 # Simulation paths
 LIPS_PATH = get_root_path()
 DIRECTORY_NAME = '../Airfrans/Dataset'
@@ -28,4 +32,7 @@ EPOCHS = 500
 # Hyperparams
 PINN_LOSS_ON = False
 LAMBDA = 5.0   
+
+
+
 

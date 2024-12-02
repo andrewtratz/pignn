@@ -51,18 +51,7 @@ def loss_fn(y_pred, y_true):
     losses.append(overall_loss)
     return losses
 
-class ScaleUp(nn.Module):
-    def forward(self, output):
-        y = output.clone()
-        speed = y[:,0]*STDS['speed'] + MEANS['speed']
-        y[:,0] = (torch.cos(2*torch.pi + output[:,1]))*speed # X velocity
-        # y[:, torch.where(output[:,1]<=0.0)] = -torch.multiply((torch.sin(2*torch.pi + torch.squeeze(output[torch.where(output[:,1]<=0),1]))),speed[torch.where(output[:,1]<=0)])
-        # y[:, torch.where(output[:,1]>0.0)] = torch.multiply((torch.sin(2*torch.pi + torch.squeeze(output[torch.where(output[:,1]>0),1]))),speed[torch.where(output[:,1]>0)])
-        y[:,1] = (torch.sin(2*torch.pi + output[:,1]))*speed
-        # y[:,1] *= (output[:,1] / torch.abs(output[:,1]))
-        y[:, 2] = (y[:,2]*STDS['pressure']) + MEANS['pressure']
-        y[:,3] = (y[:,3]*STDS['turbulent_viscosity']) + MEANS['turbulent_viscosity']
-        return y
+
 
 
 if PINN_LOSS_ON:
