@@ -13,6 +13,15 @@ from model import *
 if not os.path.exists('models'):
     os.mkdir('models')
 
+# Load benchmark to debug
+# from lips.benchmark.airfransBenchmark import AirfRANSBenchmark
+
+# benchmark=AirfRANSBenchmark(benchmark_path = DIRECTORY_NAME,
+#                             config_path = BENCH_CONFIG_PATH,
+#                             benchmark_name = BENCHMARK_NAME,
+#                             log_path = LOG_PATH)
+# benchmark.load(path=DIRECTORY_NAME)
+
 current_time = datetime.datetime.now()
 time_path = str(current_time.month) + '_' + str(current_time.day) + '_' + str(current_time.hour) + '_' + str(current_time.minute) 
 save_path = os.path.join('models', time_path)
@@ -25,16 +34,21 @@ for i in range(0,103):
     if i not in cv_indices:
         train_indices.append(i)
 
-train_loader = MyLoader(train_indices, shuffle=True, cap_size=CAP_SIZE)
-cv_loader = MyLoader(cv_indices, shuffle=True, cap_size=CAP_SIZE)
+train_loader = MyLoader(train_indices, shuffle=SHUFFLE, cap_size=CAP_SIZE)
+cv_loader = MyLoader(cv_indices, shuffle=False, cap_size=CAP_SIZE)
 
 device = torch.device('cuda')
 
 from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter()
 
-model = GCN().to(device)
-optimizer = torch.optim.Adam(model.parameters(), lr=0.005, weight_decay=5e-4)
+model = GCN()
+if LOAD_MODEL:
+    print("Loading existing weights!")
+    model.load_state_dict(torch.load(MODEL_PATH, weights_only=True))
+
+model.to(device)
+optimizer = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=5e-4)
 
 model.train()
 # scaler = torch.tensor([SPEED_SCALE, SPEED_SCALE, PRESS_SCALE, TURB_SCALE]).to(device)
@@ -50,9 +64,6 @@ def loss_fn(y_pred, y_true):
         overall_loss += losses[-1]
     losses.append(overall_loss)
     return losses
-
-
-
 
 if PINN_LOSS_ON:
     losstypes = ['loss_speed', 'loss_theta', 'loss_press', 'loss_turb', 'mass_err', 'mom_x_err', 'mom_y_err', 'loss_train', 'combo_train']

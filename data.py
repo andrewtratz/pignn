@@ -118,7 +118,7 @@ def make_edges(sim):
 
     for i, edge in zip(range(0, len(edge_dict)), edge_dict.values()):
         edge_index[:,i] = edge
-        edge_features[i,0] = np.sqrt(np.sum([sim.position[edge[0]]**2, sim.position[edge[1]]**2]))
+        edge_features[i,0] = np.sqrt(np.sum((sim.position[edge[0]] - sim.position[edge[1]])**2))
         # print(angle_off_x_axis(delta_vector(sim.position[edge[0]], sim.position[edge[1]])))
         edge_features[i,1] = angle_off_x_axis(delta_vector(sim.position[edge[0]], sim.position[edge[1]]))
     

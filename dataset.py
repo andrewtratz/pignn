@@ -18,7 +18,7 @@ from physics import *
 from interpolation import *
 
 class AirFransGeo():
-    def __init__(self, dataset, indices, max_neighbors=9, save_path='traincv/', device='cuda'):
+    def __init__(self, dataset, indices, max_neighbors=9, save_path='Datasets/traincv/', device='cuda'):
         self.dataset = dataset
         self.indices = indices
         self.data = []

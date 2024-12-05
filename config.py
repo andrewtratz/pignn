@@ -2,8 +2,8 @@ import os
 from lips import get_root_path
 
 # Model load
-LOAD_MODEL = True
-MODEL_PATH = 'models/11_25_0_10/best_model.pth'
+LOAD_MODEL = False
+MODEL_PATH = 'models/12_3_19_34/best_model.pth'
 
 # Simulation paths
 LIPS_PATH = get_root_path()
@@ -25,13 +25,15 @@ LAYER_REPEATS = 4
 activation = 'GELU'
 
 # Training params
-CAP_SIZE = 2000
+CAP_SIZE = 1000
+SHUFFLE = True
 BATCH_SIZE = 1
 EPOCHS = 500
 
 # Hyperparams
 PINN_LOSS_ON = False
-LAMBDA = 5.0   
+LAMBDA = 5.0
+LR = 0.0005   
 
 
 
