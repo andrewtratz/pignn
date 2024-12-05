@@ -3,7 +3,7 @@ import torch
 from torch import nn
 
 
-# Physical constants
+# Physical constants - provided by AirfRANS dataset
 T = 298.15
 MOL = np.array(28.965338e-3) # Air molar weigth in kg/mol
 P_ref = np.array(1.01325e5) # Pressure reference in Pa
@@ -11,8 +11,9 @@ RHO = P_ref*MOL/(8.3144621*T) # Specific mass of air at temperature T
 NU = -3.400747e-6 + 3.452139e-8*T + 1.00881778e-10*T**2 - 1.363528e-14*T**3 # Approximation of the kinematic viscosity of air at temperature T
 C = 20.05*np.sqrt(T) # Approximation of the sound velocity of air at temperature T  
 
-
-
+# Module to compute physics-informed loss function
+# Relies on precomputation of interpolation coefficients per node
+# Relies on precomputation of constants used to calculate first and second derivatives based on interpolation results
 class PINNLoss(nn.Module):
     def __init__(self, device):
         super(PINNLoss, self).__init__()
@@ -44,7 +45,7 @@ class PINNLoss(nn.Module):
         rhs = -dp_dy + (NU + preds[:, 3])*(d2vy_d2x + d2vy_d2y)
         mom_y_err = torch.abs(lhs-rhs)
 
-        # Don't penalize if within baseline error level of ground truth data
+        # Don't penalize if within baseline error level of ground truth data (calibration)
         if baseline_err is not None:
             zero = torch.zeros_like(mass_err, device=mass_err.device)
             base_mass_err = baseline_err['mass_err'].to(self.device)

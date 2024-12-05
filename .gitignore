@@ -9,3 +9,6 @@
 *.csv*
 *__*
 *.prof*
+*11_22_16_36*
+__pycache__
+*Datasets*

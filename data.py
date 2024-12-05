@@ -1,11 +1,10 @@
+# Collection of helper functions used in data preprocessing
 
 import os
 import numpy as np
 import torch
 from torch import nn
-
 from torch_geometric.data import Data
-
 from lips.benchmark.airfransBenchmark import AirfRANSBenchmark
 
 from config import *
@@ -58,17 +57,15 @@ else:
     STDS = {'pressure': 2425.738434726353, 'turbulent_viscosity': 0.0030420989011928183, 'speed': 8.487422521188462, 'position': 1.0}
 
 
+# Module which converts from raw outputs to scaled outputs
 class ScaleUp(nn.Module):
     def forward(self, output):
         y = output.clone()
         speed = y[:,0]*STDS['speed'] + MEANS['speed']
         y[:,0] = (torch.cos(2*torch.pi + output[:,1]))*speed # X velocity
-        # y[:, torch.where(output[:,1]<=0.0)] = -torch.multiply((torch.sin(2*torch.pi + torch.squeeze(output[torch.where(output[:,1]<=0),1]))),speed[torch.where(output[:,1]<=0)])
-        # y[:, torch.where(output[:,1]>0.0)] = torch.multiply((torch.sin(2*torch.pi + torch.squeeze(output[torch.where(output[:,1]>0),1]))),speed[torch.where(output[:,1]>0)])
-        y[:,1] = (torch.sin(2*torch.pi + output[:,1]))*speed
-        # y[:,1] *= (output[:,1] / torch.abs(output[:,1]))
-        y[:, 2] = (y[:,2]*STDS['pressure']) + MEANS['pressure']
-        y[:,3] = (y[:,3]*STDS['turbulent_viscosity']) + MEANS['turbulent_viscosity']
+        y[:,1] = (torch.sin(2*torch.pi + output[:,1]))*speed # Y velocity
+        y[:, 2] = (y[:,2]*STDS['pressure']) + MEANS['pressure'] # Scaled pressure
+        y[:,3] = (y[:,3]*STDS['turbulent_viscosity']) + MEANS['turbulent_viscosity'] # Scaled viscosity
         return y
 
 
@@ -119,7 +116,6 @@ def make_edges(sim):
     for i, edge in zip(range(0, len(edge_dict)), edge_dict.values()):
         edge_index[:,i] = edge
         edge_features[i,0] = np.sqrt(np.sum((sim.position[edge[0]] - sim.position[edge[1]])**2))
-        # print(angle_off_x_axis(delta_vector(sim.position[edge[0]], sim.position[edge[1]])))
         edge_features[i,1] = angle_off_x_axis(delta_vector(sim.position[edge[0]], sim.position[edge[1]]))
     
     return edge_index, edge_features

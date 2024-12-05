@@ -1,3 +1,5 @@
+# Script used to preprocess datasets
+
 import os
 import numpy as np
 from config import *
@@ -42,8 +44,8 @@ else:
     else:
         # train = AirFransGeo(benchmark.train_dataset, train_indices)
         # cv = AirFransGeo(benchmark.train_dataset, cv_indices)
-        test = AirFransGeo(benchmark._test_dataset, range(34+142, 200), save_path='Datasets/test')
-        test_ood = AirFransGeo(benchmark._test_ood_dataset, range(496), save_path='Datasets/ood')
+        test = AirFransGeo(benchmark._test_dataset, range(81, 82), save_path='Datasets/test/')
+        test_ood = AirFransGeo(benchmark._test_ood_dataset, range(116, 496), save_path='Datasets/ood/')
 
         # Save files
         # file = open(os.path.join('train.pkl'), 'wb')

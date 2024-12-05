@@ -22,6 +22,7 @@ if not os.path.exists('models'):
 #                             log_path = LOG_PATH)
 # benchmark.load(path=DIRECTORY_NAME)
 
+# Create save location for best model output
 current_time = datetime.datetime.now()
 time_path = str(current_time.month) + '_' + str(current_time.day) + '_' + str(current_time.hour) + '_' + str(current_time.minute) 
 save_path = os.path.join('models', time_path)
@@ -49,12 +50,9 @@ if LOAD_MODEL:
 
 model.to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=5e-4)
-
 model.train()
-# scaler = torch.tensor([SPEED_SCALE, SPEED_SCALE, PRESS_SCALE, TURB_SCALE]).to(device)
-# x_scaler.to(device)
-# loss_fn = torch.nn.MSELoss()
 
+# L2 loss function
 def loss_fn(y_pred, y_true):
     losses = []
     overall_loss = torch.tensor(0.0).to(y_pred.device)
@@ -70,13 +68,13 @@ if PINN_LOSS_ON:
 else:
     losstypes = ['loss_speed', 'loss_theta', 'loss_press', 'loss_turb', 'loss_train']
 
+# Train a single epoch
 def train_one_epoch(model, optimizer, train_loader, device, scaler, losstypes, loss_fn, epoch):
 
     # Initiatlize losses to empty
     PL = PINNLoss(device)
     SU = ScaleUp()
-    losses={}
-    
+    losses={}    
 
     for loss in losstypes:
         losses[loss] = []
@@ -112,7 +110,7 @@ def train_one_epoch(model, optimizer, train_loader, device, scaler, losstypes, l
             loss_train.backward()
         optimizer.step()
 
-    # Wrap up epoch
+    # Wrap up epoch and record losses
     avg_losses = {}
     for loss in losstypes:
         avg_losses[loss] = torch.mean(torch.tensor(losses[loss])).detach().cpu().item()
@@ -120,11 +118,11 @@ def train_one_epoch(model, optimizer, train_loader, device, scaler, losstypes, l
     loss_str = "T Losses "
     for loss in losstypes:
         loss_str += ' ' + loss + ':' + "{:10.4f}".format(avg_losses[loss])
-    # print("Losses " + [[loss, avg_losses[loss]].join(': ') for loss in losstypes].join(' '))
     print(loss_str)
     for loss in losstypes:
         writer.add_scalar("train/" + loss, avg_losses[loss], epoch)
 
+# Perform a single pass over CV dataset
 def validation_loop(model, cv_loader, device, scaler, losstypes, loss_fn, best_loss):
 
     PL = PINNLoss(device)
@@ -145,7 +143,6 @@ def validation_loop(model, cv_loader, device, scaler, losstypes, loss_fn, best_l
             # y_true = torch.divide(batch.y, scaler)
             y_true = data.y
             loss_speed, loss_theta, loss_press, loss_turb, loss_cv = loss_fn(out, y_true)
-
             
             if PINN_LOSS_ON:
                 # Combine loss with physics-informed loss term
@@ -180,6 +177,7 @@ def validation_loop(model, cv_loader, device, scaler, losstypes, loss_fn, best_l
         writer.add_scalar("cv/" + loss, avg_losses[loss], epoch)
     return best_loss
 
+# Main training loop
 best_loss = 10000.0
 for epoch in range(EPOCHS):
     train_one_epoch(model, optimizer, train_loader, device, None, losstypes, loss_fn, epoch)

@@ -7,28 +7,30 @@ def shift_dev(t, device):
     else:
         return t
     
-
+# Create empty tensors of appropriate size
 def alloc(ns, k, y, device):
     lhs = torch.zeros((ns, k+1, k+1), dtype=torch.float32, device=device)
     rhs = torch.zeros((ns, k+1, y.shape[1]), dtype=torch.float32, device=device)
     return lhs, rhs
 
+# Make left hand side of linear system
 def make_lhs(lhs, kernel_matrix, batch_indices, k, device):
     lhs[:,:k,:k] = kernel_matrix[batch_indices, :k, :k] + 2*torch.diag(torch.ones(k, device=device))
     lhs[:,k,:] = 1.0
     lhs[:,:,k] = 1.0
     return lhs
 
+# Make right hand side of linear system
 def make_rhs(rhs, k, y, neighbors, batch_indices):
     rhs[:,:k] = y[torch.vstack([neighbors[i] for i in batch_indices])]
     rhs[:,k] = 0.0
     return rhs
 
+# Single batched call to torch.linalg.solve!
 def solve(lhs, rhs):
     return torch.linalg.solve(lhs, rhs)
 
 # Do efficient batched local interpolation of response variables over the input mesh
-
 def batched_interpolation(pinn_data, y, batch_size=1000, device='cpu'):
     n = len(pinn_data['neighbors'])
     neighbors = pinn_data['neighbors']
@@ -44,6 +46,7 @@ def batched_interpolation(pinn_data, y, batch_size=1000, device='cpu'):
     for i in range(n):
         idx_by_count[len(neighbors[i])].append(i)
 
+    # We can't have more than 10 neighbors
     for k in range(1,10):
 
         # Chunk up the indices into batches if needed
@@ -60,19 +63,7 @@ def batched_interpolation(pinn_data, y, batch_size=1000, device='cpu'):
             batch_indices = idx_by_count[k][start:end]
 
             # Create LHS tensor and RHS tensor
-            lhs, rhs = alloc(ns, k, y, device)
-            
-            # idx = 0
-            # for i in batch_indices:
-            #     lhs[idx,:k,:k] = kernel_matrix[i, :k, :k] + 2*torch.diag(torch.ones(k, device=device)) # Smoothing eliminates singularity
-            #     lhs[idx,k,:] = 1.0
-            #     lhs[idx,:,k] = 1.0 
-
-            #     # y_neighbor = y[neighbors[i].type(torch.IntTensor)]
-            #     # rhs[idx, :k] = y_neighbor[:k]
-            #     # rhs[idx, k] = 0.0
-            #     idx += 1
-
+            lhs, rhs = alloc(ns, k, y, device)          
             lhs = make_lhs(lhs, kernel_matrix, batch_indices, k, device)
             rhs = make_rhs(rhs, k, y, neighbors, batch_indices)
 

@@ -3,11 +3,14 @@ import random
 import pickle
 from tqdm import tqdm
 
+# Basic dataloader class for training and evaluation iteration
 class MyLoader():
     def __init__(self, indices, shuffle=True, cap_size=None, path='Datasets/traincv/', cache=True):
+        
         if cap_size is not None:
             indices = indices[:min(len(indices), cap_size)]
 
+        self.indices = indices
         self.n = len(indices)
         self.shuffle = shuffle
         self.data = []
@@ -29,14 +32,11 @@ class MyLoader():
 
     def __next__(self):
         if self.current < self.n:
-            # file = open('traincv/' + str(self.indices[self.order[self.current]]) + '.pkl', 'rb')
-            # data = pickle.load(file)
-            # file.close()
             self.current += 1
             if self.cache:
-                return self.data[self.order[self.current-1]]
+                return self.data[self.indices[self.order[self.current-1]]]
             else:
-                file = open(self.path + str(self.order[self.current-1]) + '.pkl', 'rb')
+                file = open(self.path + str(self.indices[self.order[self.current-1]]) + '.pkl', 'rb')
                 return pickle.load(file)
         random.shuffle(self.order)
         self.current = 0

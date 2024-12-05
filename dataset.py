@@ -17,6 +17,7 @@ from data import *
 from physics import *
 from interpolation import *
 
+# Custom dataset class which performs preprocessing. Pre-computed data is pickled and stored.
 class AirFransGeo():
     def __init__(self, dataset, indices, max_neighbors=9, save_path='Datasets/traincv/', device='cuda'):
         self.dataset = dataset
@@ -69,6 +70,8 @@ class AirFransGeo():
             surface_distance = (sim.sdf - MEANS['position']) / STDS['position']
 
             # Rotate normal vector 90 degrees, take the angle in the positive x direction
+            # For some reason this feature massively reduced model power - could be finding a local minimum with this
+
             # rotated_normal = rotate(closest_surfaces[:,2:], -np.pi/2)
             # rotated_normal[np.where(rotated_normal[:,0]<0)] = rotate(rotated_normal[np.where(rotated_normal[:,0]<0)], np.pi)
             # assert(np.min(rotated_normal[:,0]) >= 0.0)
@@ -102,7 +105,7 @@ class AirFransGeo():
             instance = Data(x=torch.from_numpy(x.astype(np.float32)), edge_index=torch.from_numpy(edge_index),
                     edge_attr=torch.from_numpy(edge_attr.astype(np.float32)), y=torch.from_numpy(y.astype(np.float32)), 
                     pos=torch.from_numpy(sim.position.astype(np.float32)))
-            self.data.append(instance)
+            # self.data.append(instance)
 
 
             # Compute data used for PINN loss function
@@ -113,9 +116,8 @@ class AirFransGeo():
             nonsurface_edge_index = torch.from_numpy(edge_index[:,non_surface])
 
             # Used https://github.com/ArmanMaesumi/torchrbf/ as reference in constructing
-            # localized interpolation functions
-
-            # Localized interpolation
+            # Localized interpolation functions to compute partial derivatives at each node
+            
             # Iterate over every node
             for k in range(x.shape[0]):
                 
@@ -140,13 +142,6 @@ class AirFransGeo():
                     dist_matrix = torch.cdist(aug_neighbors, aug_neighbors, compute_mode="use_mm_for_euclid_dist")
                     r = dist_matrix[0,:neighbors]
 
-                    # neighbors = neighbor_pos.shape[0]
-                    # aug_neighbor_indices = torch.tensor(neighbor_indices).type(torch.IntTensor)
-                    # aug_neighbors = neighbor_pos
-                    # neighbor_list.append(aug_neighbor_indices)
-                    # dist_matrix = torch.cdist(aug_neighbors, aug_neighbors, compute_mode="use_mm_for_euclid_dist")
-                    # r = torch.squeeze(torch.cdist(n_x, aug_neighbors, compute_mode='use_mm_for_euclid_dist'))
-
                     # Multiquadratic kernel matrix
                     kernel_matrix[k][:neighbors,:neighbors] = -torch.sqrt(dist_matrix**2 + 1)[:neighbors,:neighbors] 
                     # kernel_matrix[k][:neighbors,:neighbors] += torch.diag(torch.tensor([1.0])) # Smoothing - weird since it just eliminates self terms
@@ -154,12 +149,6 @@ class AirFransGeo():
                     kernel_matrix[k][neighbors,:] = 1.0 # Intercept terms - now in 0 row and column
                     kernel_matrix[k][:,neighbors] = 1.0
                     kernel_matrix[k][neighbors:, neighbors:] = 0.0
-
-                    # Compute scale and shift
-                    # mins = torch.min(neighbor_pos, dim=0).values
-                    # maxs = torch.max(neighbor_pos, dim=0).values
-                    # shift[k] = (maxs + mins) / 2
-                    # scale[k] = (maxs - mins) / 2
 
                     # Calc first derivative multipliers
                     delts = torch.cat((torch.zeros(1, 2), n_x - neighbor_pos))
@@ -169,16 +158,16 @@ class AirFransGeo():
                     d2terms[k, :neighbors, :] = delts**2 / torch.unsqueeze((r**2+1)**(1.5), 1) - \
                                                             torch.unsqueeze(1/(r**2+1)**(0.5), 1)
 
+            # Cache the data for future use
             self.pinn_data.append({})      
             self.pinn_data[-1]['neighbors'] = neighbor_list
             self.pinn_data[-1]['kernel_matrix'] = kernel_matrix
-            # self.pinn_data[i]['shift'] = shift
-            # self.pinn_data[i]['scale'] = scale
             self.pinn_data[-1]['d1terms'] = d1terms
             self.pinn_data[-1]['d2terms'] = d2terms  
 
             y = torch.hstack([torch.from_numpy(sim.velocity), torch.from_numpy(sim.pressure)])
 
+            # Keep track of the "true" coefficients and baseline errors based on the target outputs, for calibration
             coeffs = batched_interpolation(self.pinn_data[-1], y, batch_size=200000, device='cuda')
             self.pinn_data[-1]['true_coeffs'] = coeffs.detach().cpu() 
 
