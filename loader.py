@@ -34,7 +34,7 @@ class MyLoader():
         if self.current < self.n:
             self.current += 1
             if self.cache:
-                return self.data[self.indices[self.order[self.current-1]]]
+                return self.data[self.order[self.current-1]]
             else:
                 file = open(self.path + str(self.indices[self.order[self.current-1]]) + '.pkl', 'rb')
                 return pickle.load(file)
