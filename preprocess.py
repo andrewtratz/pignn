@@ -42,10 +42,10 @@ else:
         train = AirFransGeo(benchmark.train_dataset, train_indices[:1])
         # cv = AirFransGeo(benchmark.train_dataset, cv_indices[:4])
     else:
-        # train = AirFransGeo(benchmark.train_dataset, train_indices)
-        # cv = AirFransGeo(benchmark.train_dataset, cv_indices)
-        # test = AirFransGeo(benchmark._test_dataset, range(81, 82), save_path='Datasets/test/')
-        test_ood = AirFransGeo(benchmark._test_ood_dataset, range(394, 496), save_path='Datasets/ood/')
+        train = AirFransGeo(benchmark.train_dataset, train_indices)
+        cv = AirFransGeo(benchmark.train_dataset, cv_indices)
+        test = AirFransGeo(benchmark._test_dataset, range(200), save_path='Datasets/test/')
+        test_ood = AirFransGeo(benchmark._test_ood_dataset, range(496), save_path='Datasets/ood/')
 
         # Save files
         # file = open(os.path.join('train.pkl'), 'wb')

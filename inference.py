@@ -13,7 +13,13 @@ from interpolation import *
 from physics import *
 from model import *
 
-test_loader = MyLoader([i for i in range(200)], shuffle=False, cap_size=CAP_SIZE, path='Datasets/test/', cache=False)
+# Toggles test dataset versus OOD test dataset
+TEST_OOD = True
+
+if TEST_OOD:
+    test_loader = MyLoader([i for i in range(496)], shuffle=False, cap_size=CAP_SIZE, path='Datasets/ood/', cache=False)
+else:
+    test_loader = MyLoader([i for i in range(200)], shuffle=False, cap_size=CAP_SIZE, path='Datasets/test/', cache=False)
 
 device = torch.device('cuda')
 
@@ -46,9 +52,16 @@ with torch.no_grad():
         loss = loss_fn(out, data.y)
         losses.append(loss[-1])
 
+model = None
+test_loader = None
+
 preds = torch.vstack(predictions).to('cpu').numpy()
 obs = torch.vstack(observations).to('cpu').numpy()
 loss = torch.vstack(losses).to('cpu').numpy()
+
+predictions = None
+observations = None
+losses = None
 
 print('Best example')
 print(np.argmin(loss))
@@ -73,7 +86,11 @@ evaluator = AirfRANSEvaluation(config_path = BENCH_CONFIG_PATH,
                                data_path = DIRECTORY_NAME,
                                log_path = LOG_PATH)
 
-observation_metadata = benchmark._test_dataset.extra_data
+if TEST_OOD:
+    observation_metadata = benchmark._test_ood_dataset.extra_data
+else:
+    observation_metadata = benchmark._test_dataset.extra_data
+
 metrics = evaluator.evaluate(observations=observations,
                              predictions=predictions,
                              observation_metadata=observation_metadata)

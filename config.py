@@ -5,7 +5,7 @@ from lips import get_root_path
 
 # Model load
 LOAD_MODEL = False
-MODEL_PATH = 'redux_model.pth'
+MODEL_PATH = 'pinn_model.pth'
 
 # Simulation paths
 LIPS_PATH = get_root_path()
