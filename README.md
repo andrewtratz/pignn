@@ -5,11 +5,15 @@ Author: Andrew Tratz (atratz@stanford.edu)
 
 # Installation
 
-* `pip install -r requirements.txt`
-
 * `pip install airfrans`
 
-* Clone LIPS platform from `https://github.com/IRT-SystemX/LIPS.git`
+* Download AirfRANS dataset
+
+* `pip install lips`
+
+* `pip install lips.benchmark`
+
+* `pip install -r requirements.txt`
 
 * Clone ML4CFD starter kit from `https://github.com/IRT-SystemX/NeurIPS2024-ML4CFD-competition-Starting-Kit`
 

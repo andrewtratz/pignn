@@ -69,6 +69,13 @@ print(np.argmin(loss))
 predictions = {'x-velocity': preds[:,0], 'y-velocity': preds[:,1], 'pressure': preds[:,2], 'turbulent_viscosity': preds[:,3]}
 observations = {'x-velocity': obs[:,0], 'y-velocity': obs[:,1], 'pressure': obs[:,2], 'turbulent_viscosity': obs[:,3]}
 
+# Saving data
+print("Saving data to file")
+with open('ood_preds.pkl', 'wb') as handle:
+    pickle.dump(predictions, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+with open('ood_obs.pkl', 'wb') as handle:
+    pickle.dump(observations, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 from lips.evaluation.airfrans_evaluation import AirfRANSEvaluation
 # Load the required benchmark datasets
