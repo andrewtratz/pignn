@@ -33,7 +33,7 @@ BATCH_SIZE = 1
 EPOCHS = 500
 
 # Hyperparams
-PINN_LOSS_ON = False
+PINN_LOSS_ON = True
 LAMBDA = 5.0
 LR = 0.0005   
 

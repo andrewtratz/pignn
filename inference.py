@@ -14,68 +14,80 @@ from physics import *
 from model import *
 
 # Toggles test dataset versus OOD test dataset
-TEST_OOD = True
+TEST_OOD = False
+RELOAD = False
 
-if TEST_OOD:
-    test_loader = MyLoader([i for i in range(496)], shuffle=False, cap_size=CAP_SIZE, path='Datasets/ood/', cache=False)
-else:
-    test_loader = MyLoader([i for i in range(200)], shuffle=False, cap_size=CAP_SIZE, path='Datasets/test/', cache=False)
+if not RELOAD:
+    if TEST_OOD:
+        test_loader = MyLoader([i for i in range(496)], shuffle=False, cap_size=CAP_SIZE, path='Datasets/ood/', cache=False)
+    else:
+        test_loader = MyLoader([i for i in range(200)], shuffle=False, cap_size=CAP_SIZE, path='Datasets/test/', cache=False)
 
-device = torch.device('cuda')
+    device = torch.device('cuda')
 
-model = GCN()
-model.load_state_dict(torch.load(MODEL_PATH, weights_only=True))
-model.to(device)
-SU = ScaleUp()
+    model = GCN()
+    model.load_state_dict(torch.load(MODEL_PATH, weights_only=True))
+    model.to(device)
+    SU = ScaleUp()
 
-def loss_fn(y_pred, y_true):
+    def loss_fn(y_pred, y_true):
+        losses = []
+        overall_loss = torch.tensor(0.0).to(y_pred.device)
+        base_fn = torch.nn.MSELoss()
+        for i in range(y_pred.shape[1]):
+            losses.append(base_fn(y_pred[:,i], y_true[:,i]))
+            overall_loss += losses[-1]
+        losses.append(overall_loss)
+        return losses
+
+    predictions = []
+    observations = []
     losses = []
-    overall_loss = torch.tensor(0.0).to(y_pred.device)
-    base_fn = torch.nn.MSELoss()
-    for i in range(y_pred.shape[1]):
-        losses.append(base_fn(y_pred[:,i], y_true[:,i]))
-        overall_loss += losses[-1]
-    losses.append(overall_loss)
-    return losses
+    with torch.no_grad():
+        for batch in tqdm(test_loader):
+            data = batch['instance']
+            out = model(data.to(device))
+            y_true = SU(data.y)
+            y_pred = SU(out)
+            predictions.append(y_pred)
+            observations.append(y_true)
+            loss = loss_fn(out, data.y)
+            losses.append(loss[-1])
 
-predictions = []
-observations = []
-losses = []
-with torch.no_grad():
-    for batch in tqdm(test_loader):
-        data = batch['instance']
-        out = model(data.to(device))
-        y_true = SU(data.y)
-        y_pred = SU(out)
-        predictions.append(y_pred)
-        observations.append(y_true)
-        loss = loss_fn(out, data.y)
-        losses.append(loss[-1])
+    model = None
+    test_loader = None
 
-model = None
-test_loader = None
+    preds = torch.vstack(predictions).to('cpu').numpy()
+    obs = torch.vstack(observations).to('cpu').numpy()
+    loss = torch.vstack(losses).to('cpu').numpy()
 
-preds = torch.vstack(predictions).to('cpu').numpy()
-obs = torch.vstack(observations).to('cpu').numpy()
-loss = torch.vstack(losses).to('cpu').numpy()
+    predictions = None
+    observations = None
+    losses = None
 
-predictions = None
-observations = None
-losses = None
+    print('Best example')
+    print(np.argmin(loss))
 
-print('Best example')
-print(np.argmin(loss))
+    predictions = {'x-velocity': preds[:,0], 'y-velocity': preds[:,1], 'pressure': preds[:,2], 'turbulent_viscosity': preds[:,3]}
+    observations = {'x-velocity': obs[:,0], 'y-velocity': obs[:,1], 'pressure': obs[:,2], 'turbulent_viscosity': obs[:,3]}
 
-predictions = {'x-velocity': preds[:,0], 'y-velocity': preds[:,1], 'pressure': preds[:,2], 'turbulent_viscosity': preds[:,3]}
-observations = {'x-velocity': obs[:,0], 'y-velocity': obs[:,1], 'pressure': obs[:,2], 'turbulent_viscosity': obs[:,3]}
+    if TEST_OOD:
+        # Saving data
+        print("Saving data to file")
+        with open('ood_reg_preds.pkl', 'wb') as handle:
+            pickle.dump(predictions, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-# Saving data
-print("Saving data to file")
-with open('ood_preds.pkl', 'wb') as handle:
-    pickle.dump(predictions, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        with open('ood_reg_obs.pkl', 'wb') as handle:
+            pickle.dump(observations, handle, protocol=pickle.HIGHEST_PROTOCOL)
+else:
+    file = open("ood_reg_preds.pkl",'rb')
+    predictions = pickle.load(file)
+    file.close()
 
-with open('ood_obs.pkl', 'wb') as handle:
-    pickle.dump(observations, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    file = open("ood_reg_obs.pkl",'rb')
+    observations = pickle.load(file)
+    file.close()
+   
 
 from lips.evaluation.airfrans_evaluation import AirfRANSEvaluation
 # Load the required benchmark datasets
@@ -97,6 +109,8 @@ if TEST_OOD:
     observation_metadata = benchmark._test_ood_dataset.extra_data
 else:
     observation_metadata = benchmark._test_dataset.extra_data
+
+benchmark = None
 
 metrics = evaluator.evaluate(observations=observations,
                              predictions=predictions,
